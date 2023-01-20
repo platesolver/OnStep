@@ -41,7 +41,7 @@
 #define FirmwareDate          __DATE__
 #define FirmwareVersionMajor  4
 #define FirmwareVersionMinor  24      // minor version 0 to 99
-#define FirmwareVersionPatch  "r"     // for example major.minor patch: 1.3c
+#define FirmwareVersionPatch  "s"     // for example major.minor patch: 1.3c
 #define FirmwareVersionConfig 3       // internal, for tracking configuration file changes
 #define FirmwareName          "On-Step"
 #define FirmwareTime          __TIME__
@@ -56,7 +56,7 @@
 
 // Enable additional debugging and/or status messages on the specified DebugSer port
 // Note that the DebugSer port cannot be used for normal communication with OnStep
-#define DEBUG OFF             // default=OFF, use "DEBUG ON" for background errors only, use "DEBUG VERBOSE" for all errors and status messages
+#define DEBUG VERBOSE             // default=OFF, use "DEBUG ON" for background errors only, use "DEBUG VERBOSE" for all errors and status messages
 #define DebugSer SerialA      // default=SerialA, or Serial4 for example (always 9600 baud)
 
 #include <errno.h>
@@ -289,7 +289,12 @@ void setup() {
   // this sets up the sidereal timer and tracking rates
   VLF("MSG: Init sidereal timer");
   siderealInterval=nv.readLong(EE_siderealInterval); // the number of 16MHz clocks in one sidereal second (this is scaled to actual processor speed)
-  if (siderealInterval < 14360682L || siderealInterval > 17551944L) { DF("ERR, setup(): bad NV siderealInterval ("); D(siderealInterval); DL(")"); siderealInterval=masterSiderealInterval; }
+  if (siderealInterval < 14360682L || siderealInterval > 17551944L) { 
+    DF("ERR, setup(): bad NV siderealInterval ("); 
+    D(siderealInterval); 
+    DL(")"); 
+    siderealInterval=masterSiderealInterval; 
+    }
   siderealRate=siderealInterval/stepsPerSecondAxis1;
   timerRateAxis1=siderealRate;
   timerRateAxis2=siderealRate;
@@ -415,7 +420,11 @@ void setup() {
   delay(500);
 
   // prep counters (for keeping time in main loop)
-  cli(); siderealTimer=lst; guideSiderealTimer=lst; pecSiderealTimer=lst; sei();
+  cli(); 
+  siderealTimer=lst; 
+  guideSiderealTimer=lst; 
+  pecSiderealTimer=lst; 
+  sei();
   last_loop_micros=micros();
 
   VLF("MSG: OnStep is ready"); VL("");
@@ -453,7 +462,15 @@ void loop2() {
     // FLASH LED DURING SIDEREAL TRACKING
 #if LED_STATUS == ON
     if (trackingState == TrackingSidereal) {
-      if (siderealTimer%20L == 0L) { if (ledOn) { digitalWrite(LEDnegPin,HIGH); ledOn=false; } else { digitalWrite(LEDnegPin,LOW); ledOn=true; } }
+      if (siderealTimer%20L == 0L) { 
+        if (ledOn) { 
+          digitalWrite(LEDnegPin,HIGH); 
+          ledOn=false; 
+        } else { 
+          digitalWrite(LEDnegPin,LOW); 
+          ledOn=true; 
+        } 
+      }
     }
 #endif
 
@@ -523,12 +540,21 @@ void loop2() {
     if (lst%2 == 1) faultAxis2=tmcAxis2.error();
 #endif
 
-    if (faultAxis1 || faultAxis2) { generalError=ERR_MOTOR_FAULT; stopSlewingAndTracking(SS_LIMIT_HARD); }
+    if (faultAxis1 || faultAxis2) { 
+      generalError=ERR_MOTOR_FAULT; 
+      stopSlewingAndTracking(SS_LIMIT_HARD); 
+    }
 
     if (safetyLimitsOn) {
       // check altitude overhead limit and horizon limit
-      if (currentAlt < minAlt) { generalError=ERR_ALT_MIN; stopSlewingAndTracking((MOUNT_TYPE == ALTAZM)?SS_LIMIT_AXIS2_MIN:SS_LIMIT); }
-      if (currentAlt > maxAlt) { generalError=ERR_ALT_MAX; stopSlewingAndTracking((MOUNT_TYPE == ALTAZM)?SS_LIMIT_AXIS2_MAX:SS_LIMIT); }
+      if (currentAlt < minAlt) { 
+        generalError=ERR_ALT_MIN; 
+        stopSlewingAndTracking((MOUNT_TYPE == ALTAZM)?SS_LIMIT_AXIS2_MIN:SS_LIMIT); 
+      }
+      if (currentAlt > maxAlt) { 
+        generalError=ERR_ALT_MAX; 
+        stopSlewingAndTracking((MOUNT_TYPE == ALTAZM)?SS_LIMIT_AXIS2_MAX:SS_LIMIT); 
+      }
     }
 
     // OPTION TO POWER DOWN AXIS2 IF NOT MOVING
@@ -540,7 +566,8 @@ void loop2() {
 #if TIME_LOCATION_SOURCE == GPS
     if ((PPS_SENSE == OFF || ppsSynced) && !tls.active && tls.poll()) {
       SerialGPS.end();
-      currentSite=0; nv.update(EE_currentSite,currentSite);
+      currentSite=0; 
+      nv.update(EE_currentSite,currentSite);
 
       tls.getSite(latitude,longitude);
       tls.get(JD,LMT);
@@ -567,7 +594,9 @@ void loop2() {
 #endif
 
     // UPDATE THE UT1 CLOCK
-    cli(); long cs=lst; sei();
+    cli(); 
+    long cs=lst; 
+    sei();
     double t2=(double)((cs-lst_start)/100.0)/1.00273790935;
     // This just needs to be accurate to the nearest second, it's about 10x better
     UT1=UT1_start+(t2/3600.0);
@@ -584,8 +613,14 @@ void loop2() {
 #if DEBUG == VERBOSE && DEBUG_NV == ON
     static bool lastCommitted=true;
     bool committed=nv.committed();
-    if (committed && !lastCommitted) { DLF("MSG: NV commit done"); lastCommitted=committed; }
-    if (!committed && lastCommitted) { DLF("MSG: NV data in cache"); lastCommitted=committed; }
+    if (committed && !lastCommitted) { 
+      DLF("MSG: NV commit done"); 
+      lastCommitted=committed; 
+      }
+    if (!committed && lastCommitted) { 
+      DLF("MSG: NV data in cache"); 
+      lastCommitted=committed; 
+      }
 #endif
 
     // TRIGGER ESPFLASH
@@ -625,7 +660,8 @@ void loop2() {
 
 #if ROTATOR == ON && MOUNT_TYPE == ALTAZM
     // calculate and set the derotation rate as required
-    double h,d; getApproxEqu(&h,&d,true);
+    double h,d; 
+    getApproxEqu(&h,&d,true);
     if (trackingState == TrackingSidereal) rot.derotate(h,d);
 #endif
 
@@ -644,23 +680,49 @@ void loop2() {
     sei();
   #if LED_STATUS2 == ON
     if (trackingState == TrackingSidereal) {
-      if (ppsSynced) { if (led2On) { digitalWrite(LEDneg2Pin,HIGH); led2On=false; } else { digitalWrite(LEDneg2Pin,LOW); led2On=true; } } else { digitalWrite(LEDneg2Pin,HIGH); led2On=false; } // indicate PPS
+      if (ppsSynced) { 
+        if (led2On) { 
+          digitalWrite(LEDneg2Pin,HIGH); 
+          led2On=false; 
+        } else { 
+          digitalWrite(LEDneg2Pin,LOW); 
+          led2On=true; 
+        } 
+      } else { 
+        digitalWrite(LEDneg2Pin,HIGH); 
+        led2On=false; 
+      } // indicate PPS
     }
   #endif
-    if (ppsLastRateRatio != ppsRateRatio) { SiderealClockSetInterval(siderealInterval); ppsLastRateRatio=ppsRateRatio; }
+    if (ppsLastRateRatio != ppsRateRatio) { 
+      SiderealClockSetInterval(siderealInterval); 
+      ppsLastRateRatio=ppsRateRatio; 
+    }
 #endif
 
 #if LED_STATUS == ON
     // LED indicate PWR on 
-    if (trackingState != TrackingSidereal) if (!ledOn) { digitalWrite(LEDnegPin,LOW); ledOn=true; }
+    if (trackingState != TrackingSidereal) if (!ledOn) { 
+        digitalWrite(LEDnegPin,LOW); 
+        ledOn=true; 
+      }
 #endif
 #if LED_STATUS2 == ON
     // LED indicate STOP and GOTO
-    if (trackingState == TrackingMoveTo) if (!led2On) { digitalWrite(LEDneg2Pin,LOW); led2On=true; }
+    if (trackingState == TrackingMoveTo) if (!led2On) { 
+      digitalWrite(LEDneg2Pin,LOW); 
+      led2On=true; 
+      }
   #if PPS_SENSE != OFF
-    if (trackingState == TrackingNone) if (led2On) { digitalWrite(LEDneg2Pin,HIGH); led2On=false; }
+    if (trackingState == TrackingNone) if (led2On) { 
+      digitalWrite(LEDneg2Pin,HIGH); 
+      led2On=false; 
+    }
   #else
-    if (trackingState != TrackingMoveTo) if (led2On) { digitalWrite(LEDneg2Pin,HIGH); led2On=false; }
+    if (trackingState != TrackingMoveTo) if (led2On) { 
+      digitalWrite(LEDneg2Pin,HIGH); 
+      led2On=false; 
+    }
   #endif
 #endif
 
@@ -668,23 +730,42 @@ void loop2() {
     // keeps mount from tracking past the meridian limit, past the AXIS1_LIMIT_MAX, or past the Dec limits
     if (safetyLimitsOn) {
       // check for exceeding AXIS1_LIMIT_MIN or AXIS1_LIMIT_MAX
-      if (getInstrAxis1() < axis1Settings.min) { generalError=(MOUNT_TYPE==ALTAZM)?ERR_AZM:ERR_UNDER_POLE; stopSlewingAndTracking(SS_LIMIT_AXIS1_MIN); } else
-      if (getInstrAxis1() > axis1Settings.max) { generalError=(MOUNT_TYPE==ALTAZM)?ERR_AZM:ERR_UNDER_POLE; stopSlewingAndTracking(SS_LIMIT_AXIS1_MAX); } else
-      // check for exceeding Meridian Limits
-      if (meridianFlip != MeridianFlipNever) {
-        if (getInstrPierSide() == PierSideWest) {
-          if (getInstrAxis1() > degreesPastMeridianW && (!(autoMeridianFlip && goToHere(true) == CE_NONE))) { generalError=ERR_MERIDIAN; stopSlewingAndTracking(SS_LIMIT_AXIS1_MAX); }
-        } else
-        if (getInstrAxis1() < -degreesPastMeridianE) { generalError=ERR_MERIDIAN; stopSlewingAndTracking(SS_LIMIT_AXIS1_MIN); }
+      if (getInstrAxis1() < axis1Settings.min) { 
+        generalError=(MOUNT_TYPE==ALTAZM)?ERR_AZM:ERR_UNDER_POLE; 
+        stopSlewingAndTracking(SS_LIMIT_AXIS1_MIN); 
+        } else if (getInstrAxis1() > axis1Settings.max) { 
+          generalError=(MOUNT_TYPE==ALTAZM)?ERR_AZM:ERR_UNDER_POLE; stopSlewingAndTracking(SS_LIMIT_AXIS1_MAX); 
+        } else if (meridianFlip != MeridianFlipNever) { // check for exceeding Meridian Limits        
+          if (getInstrPierSide() == PierSideWest) {          
+            if (getInstrAxis1() > degreesPastMeridianW && (!(autoMeridianFlip && goToHere(true) == CE_NONE))) { 
+              generalError=ERR_MERIDIAN; 
+              stopSlewingAndTracking(SS_LIMIT_AXIS1_MAX); 
+              }
+            } else if (getInstrAxis1() < -degreesPastMeridianE) { 
+              generalError=ERR_MERIDIAN; 
+              stopSlewingAndTracking(SS_LIMIT_AXIS1_MIN); 
+            }
       }
     }
-    double a2; if (AXIS2_TANGENT_ARM == ON) { cli(); a2=posAxis2/axis2Settings.stepsPerMeasure; sei(); } else a2=getInstrAxis2();
+    double a2; 
+    if (AXIS2_TANGENT_ARM == ON) { 
+      cli(); 
+      a2=posAxis2/axis2Settings.stepsPerMeasure; 
+      sei(); 
+    } else {
+      a2=getInstrAxis2();
+    }
     // check for exceeding AXIS2_LIMIT_MIN or AXIS2_LIMIT_MAX
-    if (a2 < axis2Settings.min) { generalError=ERR_DEC; stopSlewingAndTracking(SS_LIMIT_AXIS2_MIN); } else
-    if (a2 > axis2Settings.max) { generalError=ERR_DEC; stopSlewingAndTracking(SS_LIMIT_AXIS2_MAX); } else
-    // automatically clear error in TA mode
-    if (AXIS2_TANGENT_ARM == ON && (trackingState == TrackingSidereal && generalError == ERR_DEC)) generalError=ERR_NONE;
-
+    if (a2 < axis2Settings.min) { 
+      generalError=ERR_DEC; 
+      stopSlewingAndTracking(SS_LIMIT_AXIS2_MIN); 
+    } else if (a2 > axis2Settings.max) { 
+      generalError=ERR_DEC; 
+      stopSlewingAndTracking(SS_LIMIT_AXIS2_MAX); 
+      } else if (AXIS2_TANGENT_ARM == ON && (trackingState == TrackingSidereal && generalError == ERR_DEC)) { // automatically clear error in TA mode
+        generalError=ERR_NONE;
+      }
+    }
   } else {
     // COMMAND PROCESSING --------------------------------------------------------------------------------
     processCommands();
@@ -707,18 +788,28 @@ void stopSlewingAndTracking(StopSlewActions ss) {
     }
   } else {
     if (spiralGuide) stopGuideSpiral();
-    if (ss == SS_ALL_FAST || ss == SS_LIMIT_HARD) { stopGuideAxis1(); stopGuideAxis2(); } else
-    if (ss == SS_LIMIT_AXIS1_MIN) {
+    if (ss == SS_ALL_FAST || ss == SS_LIMIT_HARD) { stopGuideAxis1(); stopGuideAxis2(); 
+    } else if (ss == SS_LIMIT_AXIS1_MIN) {
       if (guideDirAxis1 == 'e' ) guideDirAxis1='b';
     } else
     if (ss == SS_LIMIT_AXIS1_MAX) {
       if (guideDirAxis1 == 'w' ) guideDirAxis1='b';
-    } else
-    if (ss == SS_LIMIT_AXIS2_MIN) {
-      if (getInstrPierSide() == PierSideWest) { if (guideDirAxis2 == 'n' ) guideDirAxis2='b'; } else if (guideDirAxis2 == 's' ) guideDirAxis2='b';
-    } else
-    if (ss == SS_LIMIT_AXIS2_MAX) {
-      if (getInstrPierSide() == PierSideWest) { if (guideDirAxis2 == 's' ) guideDirAxis2='b'; } else if (guideDirAxis2 == 'n' ) guideDirAxis2='b';
+    } else if (ss == SS_LIMIT_AXIS2_MIN) {
+      if (getInstrPierSide() == PierSideWest) { 
+        if (guideDirAxis2 == 'n' ) {
+          guideDirAxis2='b'; 
+        }
+      } else if (guideDirAxis2 == 's' ) { 
+        guideDirAxis2='b';
+      }
+    } else if (ss == SS_LIMIT_AXIS2_MAX) {
+      if (getInstrPierSide() == PierSideWest) { 
+        if (guideDirAxis2 == 's' ) { 
+          guideDirAxis2='b';
+        } 
+      } else if (guideDirAxis2 == 'n' ) { 
+        guideDirAxis2='b'; 
+      }
     }
     if (trackingState != TrackingNone) {
       if (ss != SS_ALL_FAST) {
